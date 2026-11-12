@@ -1,3 +1,4 @@
+from app.config import DEFAULT_DROPZONE_DIR, DEFAULT_DROPZONE_EXTENSIONS
 from app.db import connect
 
 
@@ -40,8 +41,29 @@ def init_db():
             artifact_rows INTEGER NOT NULL DEFAULT 0,
             updated_at TEXT
         );
+        CREATE TABLE IF NOT EXISTS trigger_batches(
+            id INTEGER PRIMARY KEY,
+            drop_dir TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            size_bytes INTEGER NOT NULL DEFAULT 0,
+            discovered_at TEXT NOT NULL,
+            status TEXT NOT NULL,
+            status_note TEXT,
+            orchestration_id INTEGER,
+            trigger_count INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL,
+            UNIQUE(drop_dir, filename)
+        );
+        CREATE TABLE IF NOT EXISTS trigger_events(
+            id INTEGER PRIMARY KEY,
+            batch_id INTEGER NOT NULL,
+            event TEXT NOT NULL,
+            detail TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
         """
     )
+    _migrate_orchestrations(conn)
     if conn.execute("SELECT COUNT(*) c FROM jobs").fetchone()["c"] == 0:
         jobs = [
             (
@@ -85,5 +107,21 @@ def init_db():
             "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
             ("default_max_attempts", "1"),
         )
+    conn.execute(
+        "INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)",
+        ("dropzone_dir", DEFAULT_DROPZONE_DIR),
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)",
+        ("dropzone_extensions", DEFAULT_DROPZONE_EXTENSIONS),
+    )
     conn.commit()
     conn.close()
+
+
+def _migrate_orchestrations(conn):
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(orchestrations)").fetchall()}
+    if "source" not in cols:
+        conn.execute("ALTER TABLE orchestrations ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'")
+    if "trigger_batch_id" not in cols:
+        conn.execute("ALTER TABLE orchestrations ADD COLUMN trigger_batch_id INTEGER")

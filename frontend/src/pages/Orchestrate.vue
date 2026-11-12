@@ -30,10 +30,12 @@ onMounted(async () => {
       <h3>最近一次报告</h3>
       <p>
         #{{ last.id }} · <span class="tag ok">{{ last.status }}</span> ·
+        来源 {{ last.source }}<template v-if="last.trigger_batch_id">（批次 #{{ last.trigger_batch_id }}）</template> ·
         succeeded {{ last.report?.succeeded }} /
         failed {{ last.report?.failed }} /
         skipped {{ last.report?.skipped }} /
         attempts {{ last.report?.attempt_count }}
+        · 对账 <span class="tag" :class="last.report?.reconcile_ok ? 'ok' : 'danger'">{{ last.report?.reconcile_ok ? 'OK' : '不平' }}</span>
       </p>
       <p class="mono muted">watermarked_jobs={{ last.report?.watermarked_jobs }} layers={{ last.report?.layer_count }}</p>
       <p>
@@ -45,14 +47,16 @@ onMounted(async () => {
     <div class="panel">
       <h3>历史编排</h3>
       <table>
-        <thead><tr><th>ID</th><th>状态</th><th>成功</th><th>失败</th><th>跳过</th><th>开始</th></tr></thead>
+        <thead><tr><th>ID</th><th>状态</th><th>来源</th><th>成功</th><th>失败</th><th>跳过</th><th>对账</th><th>开始</th></tr></thead>
         <tbody>
           <tr v-for="o in history" :key="o.id">
             <td>{{ o.id }}</td>
             <td>{{ o.status }}</td>
+            <td>{{ o.source }}<template v-if="o.trigger_batch_id"> #{{ o.trigger_batch_id }}</template></td>
             <td>{{ o.report?.succeeded }}</td>
             <td>{{ o.report?.failed }}</td>
             <td>{{ o.report?.skipped }}</td>
+            <td><span class="tag" :class="o.report?.reconcile_ok ? 'ok' : 'danger'">{{ o.report?.reconcile_ok ? 'OK' : '不平' }}</span></td>
             <td class="mono">{{ o.started_at }}</td>
           </tr>
         </tbody>

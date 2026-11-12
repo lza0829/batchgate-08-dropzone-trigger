@@ -14,6 +14,12 @@ from app.repositories import watermarks as wm_repo
 def dashboard_stats() -> dict[str, Any]:
     conn = connect()
     try:
+        batch_counts = {
+            r["status"]: r["c"]
+            for r in conn.execute(
+                "SELECT status, COUNT(*) c FROM trigger_batches GROUP BY status"
+            ).fetchall()
+        }
         return {
             "job_count": conn.execute("SELECT COUNT(*) c FROM jobs").fetchone()["c"],
             "enabled_jobs": conn.execute(
@@ -28,16 +34,21 @@ def dashboard_stats() -> dict[str, Any]:
             "watermarked_jobs": conn.execute(
                 "SELECT COUNT(*) c FROM watermarks WHERE watermark_ts IS NOT NULL"
             ).fetchone()["c"],
+            "dropzone_batches": batch_counts,
         }
     finally:
         conn.close()
 
 
-def run_orchestration() -> dict[str, Any]:
+def run_orchestration(
+    *, source: str = "manual", trigger_batch_id: int | None = None
+) -> dict[str, Any]:
     conn = connect()
     try:
         jobs = [j for j in jobs_repo.list_jobs(conn) if j["enabled"]]
-        orch_id = orch_repo.create_orchestration(conn)
+        orch_id = orch_repo.create_orchestration(
+            conn, source=source, trigger_batch_id=trigger_batch_id
+        )
         success_names: set[str] = set()
         skipped = 0
         failed = 0
@@ -87,6 +98,8 @@ def run_orchestration() -> dict[str, Any]:
         attempts = orch_repo.list_attempts(conn, orch_id)
         report = {
             "orchestration_id": orch_id,
+            "source": source,
+            "trigger_batch_id": trigger_batch_id,
             "job_total": len(jobs),
             "succeeded": succeeded,
             "failed": failed,
@@ -97,6 +110,10 @@ def run_orchestration() -> dict[str, Any]:
             ).fetchone()["c"],
             "layer_count": len(layers),
         }
+        # 对账：成功+失败+跳过 必须同时等于作业总数与尝试记录数
+        report["reconcile_ok"] = (
+            succeeded + failed + skipped == len(jobs) == len(attempts)
+        )
         status = "ok" if failed == 0 else "partial"
         orch_repo.finish_orchestration(conn, orch_id, status, report)
         conn.commit()

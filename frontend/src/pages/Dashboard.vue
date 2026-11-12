@@ -16,6 +16,14 @@ onMounted(async () => {
       <p>作业 {{ stats.job_count }}（启用 {{ stats.enabled_jobs }}）</p>
       <p>编排 {{ stats.orchestration_count }} · 尝试 {{ stats.attempt_count }}</p>
       <p>已有水位的作业 {{ stats.watermarked_jobs }}</p>
+      <p v-if="stats.dropzone_batches">
+        落盘批次：待确认 {{ stats.dropzone_batches.pending || 0 }} ·
+        已触发 {{ stats.dropzone_batches.triggered || 0 }} ·
+        已忽略 {{ stats.dropzone_batches.ignored || 0 }} ·
+        无效 {{ stats.dropzone_batches.invalid || 0 }} ·
+        触发失败 {{ stats.dropzone_batches.failed || 0 }}
+        <router-link to="/dropzone" style="margin-left:0.5rem">落盘触发 →</router-link>
+      </p>
     </div>
   </div>
 </template>

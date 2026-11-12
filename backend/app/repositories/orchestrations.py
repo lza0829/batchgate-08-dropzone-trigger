@@ -11,10 +11,15 @@ def _now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def create_orchestration(conn: sqlite3.Connection) -> int:
+def create_orchestration(
+    conn: sqlite3.Connection,
+    *,
+    source: str = "manual",
+    trigger_batch_id: int | None = None,
+) -> int:
     cur = conn.execute(
-        "INSERT INTO orchestrations(status, started_at, finished_at, report_json) VALUES (?,?,?,?)",
-        ("running", _now(), None, "{}"),
+        "INSERT INTO orchestrations(status, started_at, finished_at, report_json, source, trigger_batch_id) VALUES (?,?,?,?,?,?)",
+        ("running", _now(), None, "{}", source, trigger_batch_id),
     )
     return int(cur.lastrowid)
 
@@ -33,7 +38,7 @@ def finish_orchestration(
 
 def get_orchestration(conn: sqlite3.Connection, orch_id: int) -> dict[str, Any] | None:
     r = conn.execute(
-        "SELECT id, status, started_at, finished_at, report_json FROM orchestrations WHERE id=?",
+        "SELECT id, status, started_at, finished_at, report_json, source, trigger_batch_id FROM orchestrations WHERE id=?",
         (orch_id,),
     ).fetchone()
     if not r:
@@ -45,7 +50,7 @@ def get_orchestration(conn: sqlite3.Connection, orch_id: int) -> dict[str, Any] 
 
 def list_orchestrations(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     rows = conn.execute(
-        "SELECT id, status, started_at, finished_at, report_json FROM orchestrations ORDER BY id DESC"
+        "SELECT id, status, started_at, finished_at, report_json, source, trigger_batch_id FROM orchestrations ORDER BY id DESC"
     ).fetchall()
     out = []
     for r in rows:
